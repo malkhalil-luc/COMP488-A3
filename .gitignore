@@ -23,6 +23,7 @@ coverage.xml
 cover/
 __pypackages__/
 .env
+.venv
 .envrc
 .venv
 env/

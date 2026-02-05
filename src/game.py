@@ -60,6 +60,7 @@ class Game:
             return 0
 
     def _save_high_score(self) -> None:
+        self.save_path.parent.mkdir(parents=True, exist_ok=True)
         self.save_path.write_text(
             json.dumps({"high_score": int(self.high_score)}, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",

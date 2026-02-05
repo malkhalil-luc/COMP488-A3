@@ -4,7 +4,7 @@ from src.game import Game
 
 def main() -> None:
     pygame.init()
-    pygame.display.set_caption("Week 1 Intro Arcade (Pygame)")
+    pygame.display.set_caption("Game Dev. Arcade (Pygame)")
 
     game = Game()
     clock = pygame.time.Clock()
@@ -12,6 +12,7 @@ def main() -> None:
     running = True
     while running:
         dt = clock.tick(game.fps) / 1000.0
+        dt = min(dt, 0.05)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
