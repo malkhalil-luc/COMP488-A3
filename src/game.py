@@ -40,6 +40,9 @@ SLOW_ZONE_WIDTH = 260
 SLOW_ZONE_HEIGHT = 80
 
 PAUSE_LOST_LIFE = "lost_life"
+STATE_TITLE = "title"
+STATE_PLAYING = "playing"
+STATE_GAMEOVER = "gameover"
 
 
 COLORS = Colors()
@@ -58,7 +61,7 @@ class Game:
         self.save_path = Path(__file__).resolve().parent.parent / "data" / "save.json"
         self.high_score = self._load_high_score()
 
-        self.state: str = "title"  # title | playing | gameover
+        self.state: str = STATE_TITLE  # title | playing | gameover
         self.pause_state: str | None = None
 
         self.p_name = "Mahran"
@@ -128,7 +131,7 @@ class Game:
         # Keep coin away from top HUD area.
         return pygame.Rect(
             random.randrange(20, self.w - 20),
-            random.randrange(90, self.h - 20),
+            random.randrange(HUD_HEIGHT+30, self.h - 20),
             COIN_SIZE,
             COIN_SIZE,
         )
@@ -157,15 +160,15 @@ class Game:
                 pygame.event.post(pygame.event.Event(pygame.QUIT))
 
             elif event.key == pygame.K_RETURN:
-                if self.state in ("title", "gameover"):
+                if self.state in (STATE_TITLE, STATE_GAMEOVER):
                     self.lives = 3
                     self.level = 1
                     self.curr_level_coins = 0
                     self._reset_run()
-                    self.state = "playing"
+                    self.state = STATE_PLAYING
 
     def update(self, dt: float) -> None:
-        if self.state != "playing" or self.pause_state:
+        if self.state != STATE_PLAYING or self.pause_state:
             return
 
         keys = pygame.key.get_pressed()
@@ -205,12 +208,14 @@ class Game:
 
             if self.curr_level_coins >= self.to_next_level_coins:
                 self.curr_level_coins = 0
+                #move to the next level, add enemy, update flow zone
                 self.level += 1
-                self.next_level()
+                self._next_level()
 
         if self.player.collidelist(self.enemy_rects) != -1:
             if self.lives > 1:
                 self.lives -= 1
+                #pause for a lost life
                 self.pause_state = PAUSE_LOST_LIFE
                 self.player.center = (
                     self.w // 2,
@@ -218,7 +223,8 @@ class Game:
                 )
                 self.player_v.update(0, 0)
             else:
-                self.state = "gameover"
+                # no more lives, game over
+                self.state = STATE_GAMEOVER
                 if self.score > self.high_score:
                     self.high_score = self.score
                     self._save_high_score()
@@ -226,15 +232,15 @@ class Game:
     def draw(self) -> None:
         self.screen.fill(COLORS.bg)
 
-        if self.state == "title":
+        if self.state == STATE_TITLE:
             self._draw_title()
-        elif self.state == "playing":
+        elif self.state == STATE_PLAYING:
             self._draw_playing()
         else:
             self._draw_gameover()
 
     def _draw_hud(self) -> None:
-        panel = pygame.Rect(12, 12, 600, 40)
+        panel = pygame.Rect(12, 12, self.w-24, HUD_HEIGHT-20)
         pygame.draw.rect(self.screen, COLORS.panel, panel, border_radius=10)
 
         text = (
@@ -242,7 +248,7 @@ class Game:
             f"High: {self.high_score}   Lives: {self.lives}   Level: {self.level}"
         )
         surf = self.font.render(text, True, COLORS.text)
-        self.screen.blit(surf, (panel.x + 12, panel.y + 12))
+        self.screen.blit(surf, (panel.x + 12, panel.y + (panel.height - surf.get_height()) //2 ))
 
     def _draw_playing(self) -> None:
         if self.pause_state == PAUSE_LOST_LIFE:
@@ -273,12 +279,14 @@ class Game:
         hint2 = self.font.render(
             "Press Enter to start. Esc to quit.", True, COLORS.text
         )
+        yModHH= HUD_HEIGHT +100
 
-        self.screen.blit(title, (self.w // 2 - title.get_width() // 2, 190))
-        self.screen.blit(hint, (self.w // 2 - hint.get_width() // 2, 250))
-        self.screen.blit(hint2, (self.w // 2 - hint2.get_width() // 2, 280))
+        self.screen.blit(title, (self.w // 2 - title.get_width() // 2, yModHH))
+        self.screen.blit(hint, (self.w // 2 - hint.get_width() // 2, yModHH + 60 ))
+        self.screen.blit(hint2, (self.w // 2 - hint2.get_width() // 2, yModHH + 90))
 
     def _draw_gameover(self) -> None:
+        yModHH= HUD_HEIGHT +100
         title = self.big_font.render("Game Over", True, COLORS.text)
         msg = self.font.render(
             f"Score: {self.score}   High: {self.high_score}", True, COLORS.text
@@ -287,11 +295,11 @@ class Game:
             "Press Enter to play again. Esc to quit.", True, COLORS.text
         )
 
-        self.screen.blit(title, (self.w // 2 - title.get_width() // 2, 190))
-        self.screen.blit(msg, (self.w // 2 - msg.get_width() // 2, 250))
-        self.screen.blit(hint, (self.w // 2 - hint.get_width() // 2, 280))
+        self.screen.blit(title, (self.w // 2 - title.get_width() // 2, yModHH))
+        self.screen.blit(msg, (self.w // 2 - msg.get_width() // 2, yModHH + 60))
+        self.screen.blit(hint, (self.w // 2 - hint.get_width() // 2, yModHH + 90))
 
-    def next_level(self):
+    def _next_level(self):
         rect = pygame.Rect(
             random.randrange(40, self.w - 40),
             random.randrange(80, self.h - 40),
