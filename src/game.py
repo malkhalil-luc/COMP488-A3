@@ -18,7 +18,28 @@ class Colors:
     enemy: tuple[int, int, int] = (191, 97, 106)
     coin: tuple[int, int, int] = (235, 203, 139)
 
-    
+
+FPS = 60
+SCREEN_WIDTH = 960
+SCREEN_HEIGHT = 540
+
+HUD_HEIGHT = 60
+
+PLAYER_SIZE = 32
+PLAYER_SPEED = 360.0
+PLAYER_SLOW_SPEED = 133.0
+
+ENEMY_SIZE = 36
+ENEMY_SPEED_X = 220
+ENEMY_SPEED_Y = 180
+
+COIN_SIZE = 18
+COINS_PER_LEVEL = 5
+
+SLOW_ZONE_WIDTH = 260
+SLOW_ZONE_HEIGHT = 80
+
+PAUSE_LOST_LIFE = "lost_life"
 
 
 COLORS = Colors()
@@ -26,27 +47,27 @@ COLORS = Colors()
 
 class Game:
     def __init__(self) -> None:
-        self.fps = 60
-        self.w = 960
-        self.h = 540
+        self.fps = FPS
+        self.w = SCREEN_WIDTH
+        self.h = SCREEN_HEIGHT
+
         self.screen = pygame.display.set_mode((self.w, self.h))
         self.font = pygame.font.SysFont(None, 24)
         self.big_font = pygame.font.SysFont(None, 48)
 
-        self.save_path = Path(__file__).resolve().parent.parent / "data" /"save.json"
+        self.save_path = Path(__file__).resolve().parent.parent / "data" / "save.json"
         self.high_score = self._load_high_score()
 
         self.state: str = "title"  # title | playing | gameover
+        self.pause_state: str | None = None
 
         self.p_name = "Mahran"
-        self.lives = 3 # lives
-        self.level = 1 # level: number of enemies FOR NOW
-        self.currLevelCoins = 0 
-        self.toNextLevCoins = 5
-        self.pause_state = None # Lost_life_pause, player_pause
+        self.lives = 3
+        self.level = 1
+        self.curr_level_coins = 0
+        self.to_next_level_coins = COINS_PER_LEVEL
 
-        self.slowZoneColor = (80, 120, 200)
-
+        self.slow_zone_color = (80, 120, 200)
 
         self._reset_run()
 
@@ -62,142 +83,142 @@ class Game:
     def _save_high_score(self) -> None:
         self.save_path.parent.mkdir(parents=True, exist_ok=True)
         self.save_path.write_text(
-            json.dumps({"high_score": int(self.high_score)}, indent=2, sort_keys=True) + "\n",
+            json.dumps({"high_score": int(self.high_score)}, indent=2, sort_keys=True)
+            + "\n",
             encoding="utf-8",
         )
 
     def _reset_run(self) -> None:
         # set player position, reuse in case player has remaining lives in Update method if collision happens
-        self.player = pygame.Rect(self.w // 2 - 16, self.h // 2 - 16, 32, 32) 
+        self.player = pygame.Rect(
+            self.w // 2 - PLAYER_SIZE,
+            HUD_HEIGHT + (self.h - HUD_HEIGHT) // 2 - PLAYER_SIZE,
+            PLAYER_SIZE,
+            PLAYER_SIZE,
+        )
         self.player_v = pygame.Vector2(0, 0)
 
-        zoneWidth, zoneHeight = 260,80
-        x = random.randrange(40, self.w - zoneWidth - 40)
-        y = random.randrange(80, self.h - zoneHeight - 40)
-
-        self.slowZone = pygame.Rect(x, y, zoneWidth,zoneHeight)
+        x = random.randrange(40, self.w - SLOW_ZONE_WIDTH - 40)
+        y = random.randrange(80, self.h - SLOW_ZONE_HEIGHT - 40)
+        self.slow_zone = pygame.Rect(x, y, SLOW_ZONE_WIDTH, SLOW_ZONE_HEIGHT)
 
         self.score = 0
         self.alive_time = 0.0
 
         self.enemy_rects: list[pygame.Rect] = []
         self.enemy_vs: list[pygame.Vector2] = []
-        for _ in range(self.level):# # of enemies
-            r = pygame.Rect(random.randrange(40, self.w - 40), random.randrange(80, self.h - 40), 36, 36)
-            v = pygame.Vector2(random.choice([-1, 1]) * 220, random.choice([-1, 1]) * 180)
-            self.enemy_rects.append(r)
-            self.enemy_vs.append(v)
+
+        for _ in range(self.level):
+            rect = pygame.Rect(
+                random.randrange(40, self.w - 40),
+                random.randrange(80, self.h - 40),
+                ENEMY_SIZE,
+                ENEMY_SIZE,
+            )
+            vel = pygame.Vector2(
+                random.choice([-1, 1]) * ENEMY_SPEED_X,
+                random.choice([-1, 1]) * ENEMY_SPEED_Y,
+            )
+            self.enemy_rects.append(rect)
+            self.enemy_vs.append(vel)
 
         self.coin = self._spawn_coin()
 
     def _spawn_coin(self) -> pygame.Rect:
         # Keep coin away from top HUD area.
-        return pygame.Rect(random.randrange(20, self.w - 20), random.randrange(90, self.h - 20), 18, 18)
+        return pygame.Rect(
+            random.randrange(20, self.w - 20),
+            random.randrange(90, self.h - 20),
+            COIN_SIZE,
+            COIN_SIZE,
+        )
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.QUIT:
             pygame.quit()
-        
+
         if event.type == pygame.KEYDOWN:
-            if self.pause_state == "Lost_life_Pause":
+            if self.pause_state == PAUSE_LOST_LIFE:
                 if event.key == pygame.K_ESCAPE:
                     pygame.event.post(pygame.event.Event(pygame.QUIT))
                 elif event.key == pygame.K_RETURN:
-                    self.pause_state= None
-                    # reset enemies and coin
+                    self.pause_state = None
                     for i, r in enumerate(self.enemy_rects):
                         r.x = random.randrange(40, self.w - 40)
                         r.y = random.randrange(80, self.h - 40)
-                        self.enemy_vs[i] = pygame.Vector2(random.choice([-1, 1]) * 220,random.choice([-1, 1]) * 180)
+                        self.enemy_vs[i] = pygame.Vector2(
+                            random.choice([-1, 1]) * ENEMY_SPEED_X,
+                            random.choice([-1, 1]) * ENEMY_SPEED_Y,
+                        )
                     self.coin = self._spawn_coin()
                 return
+
             if event.key == pygame.K_ESCAPE:
                 pygame.event.post(pygame.event.Event(pygame.QUIT))
-            elif event.key == pygame.K_RETURN: 
+
+            elif event.key == pygame.K_RETURN:
                 if self.state in ("title", "gameover"):
                     self.lives = 3
                     self.level = 1
-                    self.currLevelCoins = 0
+                    self.curr_level_coins = 0
                     self._reset_run()
                     self.state = "playing"
 
     def update(self, dt: float) -> None:
-        if self.state != "playing":
-            return
-        if self.pause_state == "Lost_life_Pause":
+        if self.state != "playing" or self.pause_state:
             return
 
-        self.alive_time += dt
-
-        # Input: map keys -> direction.
         keys = pygame.key.get_pressed()
-        input_x = 0.0
-        input_y = 0.0
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            input_x -= 1.0
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            input_x += 1.0
-        if keys[pygame.K_UP] or keys[pygame.K_w]:
-            input_y -= 1.0
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            input_y += 1.0
+        input_x = (keys[pygame.K_RIGHT] or keys[pygame.K_d]) - (
+            keys[pygame.K_LEFT] or keys[pygame.K_a]
+        )
+        input_y = (keys[pygame.K_DOWN] or keys[pygame.K_s]) - (
+            keys[pygame.K_UP] or keys[pygame.K_w]
+        )
 
-        # Movement: velocity integrates into position; dt makes it frame-rate independent.
-        speed = 360.0
-        if self.player.colliderect(self.slowZone):
-            speed = 133.0
-        self.player_v.x = input_x * speed
-        self.player_v.y = input_y * speed
+        speed = (
+            PLAYER_SLOW_SPEED
+            if self.player.colliderect(self.slow_zone)
+            else PLAYER_SPEED
+        )
+        self.player_v.update(input_x * speed, input_y * speed)
 
         self.player.x += int(self.player_v.x * dt)
         self.player.y += int(self.player_v.y * dt)
-        self.player.clamp_ip(pygame.Rect(0, 60, self.w, self.h - 60))
+        self.player.clamp_ip(pygame.Rect(0, HUD_HEIGHT, self.w, self.h - HUD_HEIGHT))
 
-        # Enemies: bounce around the playfield.
-        bounds = pygame.Rect(0, 60, self.w, self.h - 60)
+        bounds = pygame.Rect(0, HUD_HEIGHT, self.w, self.h - HUD_HEIGHT)
         for i, r in enumerate(self.enemy_rects):
             v = self.enemy_vs[i]
             r.x += int(v.x * dt)
             r.y += int(v.y * dt)
-            if r.left < bounds.left:
-                r.left = bounds.left
+
+            if r.left <= bounds.left or r.right >= bounds.right:
                 v.x *= -1
-            if r.right > bounds.right:
-                r.right = bounds.right
-                v.x *= -1
-            if r.top < bounds.top:
-                r.top = bounds.top
-                v.y *= -1
-            if r.bottom > bounds.bottom:
-                r.bottom = bounds.bottom
+            if r.top <= bounds.top or r.bottom >= bounds.bottom:
                 v.y *= -1
 
-        # Collision: player with coin.
         if self.player.colliderect(self.coin):
             self.score += 1
-            self.currLevelCoins+=1
+            self.curr_level_coins += 1
             self.coin = self._spawn_coin()
 
-            if self.currLevelCoins >= self.toNextLevCoins:
-                self.level +=1
-                self.currLevelCoins = 0
+            if self.curr_level_coins >= self.to_next_level_coins:
+                self.curr_level_coins = 0
+                self.level += 1
                 self.next_level()
 
-
-        # Collision: player with enemies.
-        #collidelist:build it, check if rectangles collide returns -1 if non. 
-        #            if collided return index of first rect collided with
-        
         if self.player.collidelist(self.enemy_rects) != -1:
-            if self.lives >1: # sub lives by 1 
-                self.lives-=1
-                self.pause_state ="Lost_life_Pause"
-                #reset players positions
-                self.player.center =(self.w // 2 , self.h // 2 ) #pygame.Rect(self.w // 2 , self.h // 2 ) 
-                self.player_v = pygame.Vector2(0, 0)
-                
+            if self.lives > 1:
+                self.lives -= 1
+                self.pause_state = PAUSE_LOST_LIFE
+                self.player.center = (
+                    self.w // 2,
+                    HUD_HEIGHT + (self.h - HUD_HEIGHT) // 2,
+                )
+                self.player_v.update(0, 0)
             else:
-                self.state="gameover"
+                self.state = "gameover"
                 if self.score > self.high_score:
                     self.high_score = self.score
                     self._save_high_score()
@@ -213,50 +234,86 @@ class Game:
             self._draw_gameover()
 
     def _draw_hud(self) -> None:
-        
         panel = pygame.Rect(12, 12, 600, 40)
         pygame.draw.rect(self.screen, COLORS.panel, panel, border_radius=10)
 
-        text = f"Player: {self.p_name}    Score: {self.score}    High: {self.high_score}    Lives: {self.lives}   Level: {self.level}"
+        text = (
+            f"Player: {self.p_name}   Score: {self.score}   "
+            f"High: {self.high_score}   Lives: {self.lives}   Level: {self.level}"
+        )
         surf = self.font.render(text, True, COLORS.text)
         self.screen.blit(surf, (panel.x + 12, panel.y + 12))
 
     def _draw_playing(self) -> None:
-        if self.pause_state == "Lost_life_Pause":
-            msg = self.big_font.render("Life lost! Enter to continue, Esc to quit", True, (255, 100, 100))
-            self.screen.blit(msg, (self.w/2 - msg.get_width()/2, self.h/2 - 50))
-        self._draw_hud()
+        if self.pause_state == PAUSE_LOST_LIFE:
+            msg = self.big_font.render(
+                "Life lost! Enter to continue, Esc to quit", True, (255, 100, 100)
+            )
+            self.screen.blit(
+                msg,
+                (self.w // 2 - msg.get_width() // 2, self.h // 2 - 50),
+            )
 
-        pygame.draw.rect(self.screen, self.slowZoneColor,self.slowZone, border_radius=12)
+        self._draw_hud()
+        pygame.draw.rect(
+            self.screen, self.slow_zone_color, self.slow_zone, border_radius=12
+        )
         pygame.draw.rect(self.screen, COLORS.coin, self.coin, border_radius=7)
+
         for r in self.enemy_rects:
             pygame.draw.rect(self.screen, COLORS.enemy, r, border_radius=8)
+
         pygame.draw.rect(self.screen, COLORS.player, self.player, border_radius=8)
 
     def _draw_title(self) -> None:
         title = self.big_font.render("Intro Arcade", True, COLORS.text)
-        hint = self.font.render("Move with arrows/WASD.  Avoid red.  Collect gold.", True, COLORS.text)
-        hint2 = self.font.render("Press Enter to start.  Esc to quit.", True, COLORS.text)
+        hint = self.font.render(
+            "Move with arrows/WASD. Avoid red. Collect gold.", True, COLORS.text
+        )
+        hint2 = self.font.render(
+            "Press Enter to start. Esc to quit.", True, COLORS.text
+        )
 
-        self.screen.blit(title, (self.w / 2 - title.get_width() / 2, 190))
-        self.screen.blit(hint, (self.w / 2 - hint.get_width() / 2, 250))
-        self.screen.blit(hint2, (self.w / 2 - hint2.get_width() / 2, 280))
+        self.screen.blit(title, (self.w // 2 - title.get_width() // 2, 190))
+        self.screen.blit(hint, (self.w // 2 - hint.get_width() // 2, 250))
+        self.screen.blit(hint2, (self.w // 2 - hint2.get_width() // 2, 280))
 
     def _draw_gameover(self) -> None:
         title = self.big_font.render("Game Over", True, COLORS.text)
-        msg = self.font.render(f"Score: {self.score}   High: {self.high_score}", True, COLORS.text)
-        hint = self.font.render("Press Enter to play again.  Esc to quit.", True, COLORS.text)
+        msg = self.font.render(
+            f"Score: {self.score}   High: {self.high_score}", True, COLORS.text
+        )
+        hint = self.font.render(
+            "Press Enter to play again. Esc to quit.", True, COLORS.text
+        )
 
-        self.screen.blit(title, (self.w / 2 - title.get_width() / 2, 190))
-        self.screen.blit(msg, (self.w / 2 - msg.get_width() / 2, 250))
-        self.screen.blit(hint, (self.w / 2 - hint.get_width() / 2, 280))
+        self.screen.blit(title, (self.w // 2 - title.get_width() // 2, 190))
+        self.screen.blit(msg, (self.w // 2 - msg.get_width() // 2, 250))
+        self.screen.blit(hint, (self.w // 2 - hint.get_width() // 2, 280))
 
     def next_level(self):
-        newEnemy = pygame.Rect (random.randrange(40,self.w-40),random.randrange(80,self.h-40),36,36)
-        newVec = pygame.Vector2(random.choice([-1,1])*220,random.choice([-1,1])*180)
+        rect = pygame.Rect(
+            random.randrange(40, self.w - 40),
+            random.randrange(80, self.h - 40),
+            ENEMY_SIZE,
+            ENEMY_SIZE,
+        )
+        vel = pygame.Vector2(
+            random.choice([-1, 1]) * ENEMY_SPEED_X,
+            random.choice([-1, 1]) * ENEMY_SPEED_Y,
+        )
 
-        self.enemy_rects.append(newEnemy)
-        self.enemy_vs.append(newVec) 
+        self.enemy_rects.append(rect)
+        self.enemy_vs.append(vel)
 
-        self.slowZoneColor = (random.randint(50,255), random.randint(50,255), random.randint(50,255))
-        self.slowZone = pygame.Rect(random.randrange(80, self.w-320),random.randrange(140, self.h-120), 240, 80)
+        self.slow_zone_color = (
+            random.randint(50, 255),
+            random.randint(50, 255),
+            random.randint(50, 255),
+        )
+        self.slow_zone = pygame.Rect(
+            random.randrange(80, self.w - SLOW_ZONE_WIDTH),
+            random.randrange(HUD_HEIGHT + 20, self.h - SLOW_ZONE_HEIGHT),
+            SLOW_ZONE_WIDTH,
+            SLOW_ZONE_HEIGHT,
+        )

@@ -2,6 +2,7 @@ import pygame
 
 from src.game import Game
 
+
 def main() -> None:
     pygame.init()
     pygame.display.set_caption("Game Dev. Arcade (Pygame)")
@@ -25,6 +26,7 @@ def main() -> None:
         pygame.display.flip()
 
     pygame.quit()
+
 
 if __name__ == "__main__":
     main()
