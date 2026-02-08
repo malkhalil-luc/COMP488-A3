@@ -317,10 +317,7 @@ class Game:
             color = (50, 255, 50) if alpha > 128 else (100, 220, 100)
 
             msg = self.big_font.render(f"LEVEL {self.level}!", True, color)
-            self.screen.blit(
-                msg,
-                (self.w // 2 - msg.get_width() // 2, HUD_HEIGHT + 80),
-            )
+            self.screen.blit(msg, (self.w // 2 - msg.get_width() // 2, HUD_HEIGHT + 80))
 
     def _draw_title(self) -> None:
         title = self.big_font.render("Intro Arcade", True, COLORS.text)
@@ -498,13 +495,13 @@ class Game:
         """Load all sound effects from assets/media folder."""
         media_path = Path(__file__).resolve().parent.parent / "assets" / "media"
 
-        # Adjust volume: self.coin_sound.set_volume(0.3)  
+        # Adjust volume: self.coin_sound.set_volume(0.3)
 
         # Load coin sound
         try:
             coin_path = media_path / MEDIA_COIN
             self.coin_sound = pygame.mixer.Sound(coin_path)
-            
+
         except Exception as e:
             print(f"Could not load coin sound: {e}")
             self.coin_sound = None
